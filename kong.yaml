@@ -1,0 +1,38 @@
+_format_version: "3.0"
+services:
+- host: real-time-medicaid-integration-api.upstream
+  id: d5f2ef9b-768d-5a32-b0ad-1f01373af0f5
+  name: real-time-medicaid-integration-api
+  path: /
+  plugins: []
+  port: 443
+  protocol: https
+  routes:
+  - id: a040767e-3e5b-54b2-bdf8-498a7cc0c1a0
+    methods:
+    - POST
+    name: real-time-medicaid-integration-api_submitclaim
+    paths:
+    - ~/claims/submit$
+    plugins: []
+    regex_priority: 200
+    strip_path: false
+    tags: []
+  - id: d17adaae-c293-522a-9084-73b4545634e6
+    methods:
+    - POST
+    name: real-time-medicaid-integration-api_checkeligibility
+    paths:
+    - ~/eligibility/check$
+    plugins: []
+    regex_priority: 200
+    strip_path: false
+    tags: []
+  tags: []
+upstreams:
+- id: 448980c2-98d8-562f-a0d3-5b6789b9dadd
+  name: real-time-medicaid-integration-api.upstream
+  tags: []
+  targets:
+  - tags: []
+    target: medicaid-gateway.gov:443

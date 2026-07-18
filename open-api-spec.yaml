@@ -1,0 +1,246 @@
+openapi: 3.1.0
+info:
+  title: Real-Time Medicaid Integration API
+  description: |
+    A secure, low-latency API designed for real-time Medicaid management. 
+    It facilitates instant eligibility verification (X12 270/271 equivalents) 
+    and real-time medical claim adjudications (X12 837 equivalents).
+  version: 1.0.0
+  x-kong-service-name: real-time-medicaid-service-v1
+servers:
+  - url: https://medicaid-gateway.gov
+    description: Production Environment
+  - url: https://medicaid-gateway.gov
+    description: Sandbox/Testing Environment
+paths:
+  /eligibility/check:
+    post:
+      summary: Check Real-Time Medicaid Eligibility
+      description: Verifies active coverage, co-pays, and plan limits using a member's ID or demographic data.
+      operationId: checkEligibility
+      security:
+        - OAuth2Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EligibilityRequest'
+      responses:
+        '200':
+          description: Eligibility verification response successfully generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibilityResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500ServerError'
+
+  /claims/submit:
+    post:
+      summary: Submit Real-Time Adjudication Claim
+      description: Evaluates and process a medical claim instantly to return an adjudicated payment decision.
+      operationId: submitClaim
+      security:
+        - OAuth2Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimSubmission'
+      responses:
+        '200':
+          description: Claim adjudicated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimAdjudication'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500ServerError'
+
+components:
+  securitySchemes:
+    OAuth2Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter your OAuth2 access token.
+
+  responses:
+    400BadRequest:
+      description: Invalid request parameters or missing fields.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    401Unauthorized:
+      description: Authentication failed or token is expired.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    500ServerError:
+      description: Internal state or core adjudication processing failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    EligibilityRequest:
+      type: object
+      required:
+        - providerNpi
+        - memberId
+        - dateOfService
+      properties:
+        providerNpi:
+          type: string
+          pattern: '^[0-9]{10}$'
+          example: "1987654321"
+        memberId:
+          type: string
+          example: "MED123456789"
+        firstName:
+          type: string
+          example: "Jane"
+        lastName:
+          type: string
+          example: "Doe"
+        dateOfBirth:
+          type: string
+          format: date
+          example: "1985-05-15"
+        dateOfService:
+          type: string
+          format: date
+          example: "2026-07-18"
+
+    EligibilityResponse:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+          example: true
+        coverageStatus:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+          example: "ACTIVE"
+        planName:
+          type: string
+          example: "Medicaid Managed Care - Gold Plan"
+        coPayAmount:
+          type: number
+          format: float
+          example: 3.00
+        message:
+          type: string
+          example: "Coverage validated for requested date of service."
+
+    ClaimSubmission:
+      type: object
+      required:
+        - claimId
+        - providerNpi
+        - memberId
+        - diagnosisCodes
+        - lineItems
+      properties:
+        claimId:
+          type: string
+          format: uuid
+          example: "a80b8751-2461-41d9-813c-cc436df7a0cc"
+        providerNpi:
+          type: string
+          pattern: '^[0-9]{10}$'
+          example: "1987654321"
+        memberId:
+          type: string
+          example: "MED123456789"
+        diagnosisCodes:
+          type: array
+          items:
+            type: string
+          example: ["M54.50", "R51.9"]
+        lineItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimLineItem'
+
+    ClaimLineItem:
+      type: object
+      required:
+        - serviceDate
+        - procedureCode
+        - chargedAmount
+      properties:
+        serviceDate:
+          type: string
+          format: date
+          example: "2026-07-18"
+        procedureCode:
+          type: string
+          example: "99213"
+        chargedAmount:
+          type: number
+          format: float
+          example: 125.00
+
+    ClaimAdjudication:
+      type: object
+      properties:
+        claimId:
+          type: string
+          format: uuid
+          example: "a80b8751-2461-41d9-813c-cc436df7a0cc"
+        status:
+          type: string
+          enum: [PAID, DENIED, PENDED]
+          example: "PAID"
+        totalCharged:
+          type: number
+          format: float
+          example: 125.00
+        totalAllowed:
+          type: number
+          format: float
+          example: 85.50
+        totalPaid:
+          type: number
+          format: float
+          example: 82.50
+        patientResponsibility:
+          type: number
+          format: float
+          example: 3.00
+        adjudicationDate:
+          type: string
+          format: date-time
+          example: "2026-07-18T12:30:00Z"
+        rejectionReason:
+          type: string
+          nullable: true
+          example: null
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "INVALID_MEMBER_ID"
+        message:
+          type: string
+          example: "The provided Medicaid member ID could not be found."
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-07-18T12:31:00Z"
